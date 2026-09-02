@@ -13,6 +13,7 @@ import {
   Award
 } from 'lucide-react';
 import { AnomalyType, ReconciliationRecord, AIInvestigation } from '../types/index.js';
+import { apiFetch } from '../services/clientTelemetry.js';
 
 interface LiveSimulatorModalProps {
   onClose: () => void;
@@ -107,7 +108,7 @@ export const LiveSimulatorModal: React.FC<LiveSimulatorModalProps> = ({
 
     try {
       // Step 1: Inject issue into live dataset
-      const res = await fetch('/api/razorpay/simulate', {
+      const res = await apiFetch('/api/razorpay/simulate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -134,7 +135,7 @@ export const LiveSimulatorModal: React.FC<LiveSimulatorModalProps> = ({
       setStage('INVESTIGATING');
 
       // Fetch AI investigation from backend
-      const invRes = await fetch(`/api/investigate/${encodeURIComponent(rec.id)}`, {
+      const invRes = await apiFetch(`/api/investigate/${encodeURIComponent(rec.id)}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' }
       });
@@ -224,7 +225,7 @@ export const LiveSimulatorModal: React.FC<LiveSimulatorModalProps> = ({
     setStage('VERIFYING');
 
     try {
-      const res = await fetch(`/api/actions/${encodeURIComponent(simRecord.id)}/verify`, {
+      const res = await apiFetch(`/api/actions/${encodeURIComponent(simRecord.id)}/verify`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

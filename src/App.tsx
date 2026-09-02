@@ -13,6 +13,7 @@ import { LiveSimulatorModal } from './components/LiveSimulatorModal.js';
 import { InteractiveDemoModal } from './components/InteractiveDemoModal.js';
 import { DemoWalkthroughBanner } from './components/DemoWalkthroughBanner.js';
 import { DashboardMetrics, ReconciliationRecord, Incident } from './types/index.js';
+import { apiFetch } from './services/clientTelemetry.js';
 import {
   Bell,
   Search,
@@ -40,7 +41,7 @@ export default function App() {
 
   const fetchMetrics = async () => {
     try {
-      const res = await fetch('/api/dashboard', { headers: { Accept: 'application/json' } });
+      const res = await apiFetch('/api/dashboard', { headers: { Accept: 'application/json' } });
       const contentType = res.headers.get('content-type') || '';
       if (res.ok && contentType.includes('application/json')) {
         const data = await res.json();
@@ -65,7 +66,7 @@ export default function App() {
   const handleResetData = async () => {
     setIsResetting(true);
     try {
-      await fetch('/api/reset-data', { method: 'POST', headers: { Accept: 'application/json' } });
+      await apiFetch('/api/reset-data', { method: 'POST', headers: { Accept: 'application/json' } });
       await fetchMetrics();
       setCurrentView('overview');
     } catch (err) {
@@ -81,7 +82,7 @@ export default function App() {
 
   const handleInvestigateRecordId = async (recordId: string) => {
     try {
-      const res = await fetch(`/api/reconciliation/${encodeURIComponent(recordId)}`, { headers: { Accept: 'application/json' } });
+      const res = await apiFetch(`/api/reconciliation/${encodeURIComponent(recordId)}`, { headers: { Accept: 'application/json' } });
       const contentType = res.headers.get('content-type') || '';
       if (res.ok && contentType.includes('application/json')) {
         const data = await res.json();
@@ -118,7 +119,7 @@ export default function App() {
       if (param) setReconciliationFilter(param);
       if (param === 'EXCEPTION') {
         // Automatically open REC-007 for step 5
-        fetch('/api/reconciliation/REC-007', { headers: { Accept: 'application/json' } })
+        apiFetch('/api/reconciliation/REC-007', { headers: { Accept: 'application/json' } })
           .then(res => {
             const ct = res.headers.get('content-type') || '';
             return res.ok && ct.includes('application/json') ? res.json() : null;

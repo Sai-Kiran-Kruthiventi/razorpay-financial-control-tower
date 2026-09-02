@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { TimelineNode, ReconciliationRecord } from '../types/index.js';
+import { apiFetch } from '../services/clientTelemetry.js';
 import {
   Search,
   ArrowDown,
@@ -46,7 +47,7 @@ export const ExplainMoneyView: React.FC<ExplainMoneyProps> = ({
     setIsLoading(true);
     setErrorMessage(null);
     try {
-      const res = await fetch(`/api/transactions/${encodeURIComponent(searchId.trim())}`, {
+      const res = await apiFetch(`/api/transactions/${encodeURIComponent(searchId.trim())}`, {
         headers: { Accept: 'application/json' }
       });
       const contentType = res.headers.get('content-type') || '';

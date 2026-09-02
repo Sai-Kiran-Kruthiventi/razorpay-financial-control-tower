@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ReconciliationRecord, RecordStatus, DashboardMetrics } from '../types/index.js';
+import { apiFetch } from '../services/clientTelemetry.js';
 import {
   Search,
   CheckCircle2,
@@ -58,7 +59,7 @@ export const ReconciliationView: React.FC<ReconciliationViewProps> = ({
         status: statusFilter,
         search: searchQuery
       });
-      const res = await fetch(`/api/reconciliation?${params.toString()}`, {
+      const res = await apiFetch(`/api/reconciliation?${params.toString()}`, {
         headers: { Accept: 'application/json' }
       });
       const contentType = res.headers.get('content-type') || '';

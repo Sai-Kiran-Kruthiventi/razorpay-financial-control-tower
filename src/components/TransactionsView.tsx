@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { apiFetch } from '../services/clientTelemetry.js';
 import {
   Search,
   SearchCheck,
@@ -33,7 +34,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
         limit: '20',
         search: search.trim()
       });
-      const res = await fetch(`/api/reconciliation?${params.toString()}`, {
+      const res = await apiFetch(`/api/reconciliation?${params.toString()}`, {
         headers: { Accept: 'application/json' }
       });
       const contentType = res.headers.get('content-type') || '';

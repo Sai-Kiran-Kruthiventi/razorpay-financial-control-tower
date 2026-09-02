@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { AuditLog } from '../types/index.js';
+import { apiFetch } from '../services/clientTelemetry.js';
 import {
   Search,
   ChevronLeft,
@@ -36,7 +37,7 @@ export const AuditTrailView: React.FC<AuditTrailViewProps> = ({ onExplainMoney }
         entityId: search.trim(),
         status: statusFilter
       });
-      const res = await fetch(`/api/audit?${params.toString()}`, { headers: { Accept: 'application/json' } });
+      const res = await apiFetch(`/api/audit?${params.toString()}`, { headers: { Accept: 'application/json' } });
       const contentType = res.headers.get('content-type') || '';
       if (res.ok && contentType.includes('application/json')) {
         const data = await res.json();

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { EvaluationMetrics } from '../types/index.js';
+import { apiFetch } from '../services/clientTelemetry.js';
 import {
   Scale,
   CheckCircle2,
@@ -20,7 +21,7 @@ export const EvaluationView: React.FC = () => {
     setIsLoading(true);
     setFetchError(null);
     try {
-      const res = await fetch('/api/evaluation', { headers: { Accept: 'application/json' } });
+      const res = await apiFetch('/api/evaluation', { headers: { Accept: 'application/json' } });
       const contentType = res.headers.get('content-type') || '';
       if (res.ok && contentType.includes('application/json')) {
         const data = await res.json();

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ReconciliationRecord, AIInvestigation, IssueStatus } from '../types/index.js';
+import { apiFetch } from '../services/clientTelemetry.js';
 import {
   ShieldCheck,
   CheckCircle2,
@@ -87,7 +88,7 @@ export const InvestigationModal: React.FC<InvestigationModalProps> = ({
     const t4 = setTimeout(() => setCurrentToolStep(4), 1000);
 
     try {
-      const res = await fetch(`/api/investigate/${encodeURIComponent(recordId)}`, {
+      const res = await apiFetch(`/api/investigate/${encodeURIComponent(recordId)}`, {
         method: 'POST',
         headers: {
           'Accept': 'application/json',
@@ -201,7 +202,7 @@ export const InvestigationModal: React.FC<InvestigationModalProps> = ({
     setTimeout(() => setVerificationStep(3), 800);
 
     try {
-      const res = await fetch(`/api/actions/${encodeURIComponent(record.id)}/decision`, {
+      const res = await apiFetch(`/api/actions/${encodeURIComponent(record.id)}/decision`, {
         method: 'POST',
         headers: {
           'Accept': 'application/json',
@@ -252,7 +253,7 @@ export const InvestigationModal: React.FC<InvestigationModalProps> = ({
     setTimeout(() => setVerificationStep(3), 800);
 
     try {
-      const res = await fetch(`/api/actions/${encodeURIComponent(record.id)}/verify`, {
+      const res = await apiFetch(`/api/actions/${encodeURIComponent(record.id)}/verify`, {
         method: 'POST',
         headers: {
           'Accept': 'application/json',

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Incident } from '../types/index.js';
+import { apiFetch } from '../services/clientTelemetry.js';
 import {
   AlertTriangle,
   CheckCircle2,
@@ -30,7 +31,7 @@ export const IncidentsView: React.FC<IncidentsViewProps> = ({
     setIsLoading(true);
     setFetchError(null);
     try {
-      const res = await fetch('/api/incidents', { headers: { Accept: 'application/json' } });
+      const res = await apiFetch('/api/incidents', { headers: { Accept: 'application/json' } });
       const contentType = res.headers.get('content-type') || '';
       if (res.ok && contentType.includes('application/json')) {
         const data = await res.json();
@@ -56,7 +57,7 @@ export const IncidentsView: React.FC<IncidentsViewProps> = ({
 
   useEffect(() => {
     if (selectedIncident) {
-      fetch(`/api/incidents/${encodeURIComponent(selectedIncident.id)}`, { headers: { Accept: 'application/json' } })
+      apiFetch(`/api/incidents/${encodeURIComponent(selectedIncident.id)}`, { headers: { Accept: 'application/json' } })
         .then(res => {
           const ct = res.headers.get('content-type') || '';
           return res.ok && ct.includes('application/json') ? res.json() : null;

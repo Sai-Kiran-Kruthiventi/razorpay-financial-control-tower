@@ -1,0 +1,6 @@
+{
+  "name": "Razorpay Financial Control Tower",
+  "description": "AI-powered finance operations and reconciliation system for merchants — track, detect exceptions, investigate root causes, and verify audit trails.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

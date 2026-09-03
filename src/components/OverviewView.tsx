@@ -58,13 +58,19 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
     }
   };
 
-  const unresolvedIncidents = metrics.activeIncidents.filter(i => i.status !== 'RESOLVED');
   const totalRecords = metrics.totalRecords || 500;
   const matchedCount = metrics.matchedCount || 367;
   const exceptionCount = metrics.exceptionCount || 133;
-  const resolvedCount = metrics.resolvedCount || 82;
-  const humanReviewCount = metrics.humanReviewCount || 34;
-  const unresolvedCount = metrics.unresolvedCount || Math.max(0, exceptionCount - resolvedCount - humanReviewCount);
+  const resolvedCount = metrics.resolvedCount ?? 38;
+  const humanReviewCount = metrics.humanReviewCount ?? 10;
+  const investigatingCount = metrics.investigatingCount ?? 7;
+  const unresolvedCount = metrics.unresolvedCount ?? 78;
+  const openCount = metrics.openCount ?? (humanReviewCount + investigatingCount + unresolvedCount);
+
+  // Single source of truth for active unresolved incidents requiring operational attention
+  const unresolvedIncidents = (metrics.activeIncidents || []).filter(
+    inc => inc.status !== 'RESOLVED' && inc.status !== 'DISMISSED'
+  );
   
   const totalProcessed = metrics.totalProcessed;
   const moneyAtRisk = metrics.unresolvedAmount || Math.max(0, metrics.amountAffected - metrics.resolvedAmount);
@@ -86,9 +92,9 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
             Financial Control Room
           </h1>
           <p className="text-xs sm:text-sm text-neutral-600 font-sans">
-            {unresolvedIncidents.length > 0 ? (
+            {openCount > 0 ? (
               <span>
-                <strong className="text-[#111111] font-semibold">{unresolvedIncidents.length} open issues</strong> require attention ({formatRupees(moneyAtRisk)} capital at risk across monitored transactions).
+                <strong className="text-[#111111] font-semibold">{openCount} open issues</strong> require attention ({formatRupees(moneyAtRisk)} capital at risk across monitored transactions).
               </span>
             ) : (
               'All monitored payments and settlements are reconciled with ₹0 variance.'
@@ -102,7 +108,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
             onClick={() => onNavigate('incidents')}
             className="px-4 py-2 bg-black hover:bg-neutral-800 text-white rounded-xs text-xs font-medium uppercase tracking-wider flex items-center gap-2 transition-colors cursor-pointer"
           >
-            <span>Review Issues ({unresolvedIncidents.length})</span>
+            <span>Review Issues ({openCount})</span>
             <ArrowRight className="w-3.5 h-3.5" />
           </button>
           <button
@@ -119,7 +125,11 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
       <div>
         <div className="text-[10px] text-neutral-500 uppercase font-mono tracking-widest font-bold mb-2.5 flex items-center justify-between">
           <span>Primary Financial Metrics</span>
-          <span className="font-mono text-neutral-400">Single Source of Truth ({totalRecords} Records)</span>
+          <span className="font-mono text-neutral-400">
+            {metrics.baselineRecords || 500} Baseline Records
+            {metrics.simulatedRecords ? ` + ${metrics.simulatedRecords} Simulated` : ''} 
+            {' '}(Total Monitored: {totalRecords})
+          </span>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {/* Card 1: MONEY PROCESSED */}
@@ -131,7 +141,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
               {formatLakhs(totalProcessed)}
             </div>
             <div className="text-[11px] text-neutral-500 mt-2 font-sans">
-              Across {totalRecords} live transactions
+              {metrics.baselineRecords || 500} baseline {metrics.simulatedRecords ? `+ ${metrics.simulatedRecords} simulated ` : ''}transactions
             </div>
           </div>
 
@@ -145,7 +155,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
               {formatLakhs(moneyAtRisk)}
             </div>
             <div className="text-[11px] text-neutral-500 mt-2 font-sans">
-              Across {unresolvedIncidents.length} active issues needing attention
+              Across {openCount} open issues ({investigatingCount} investigating)
             </div>
           </div>
 
@@ -168,10 +178,10 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
               Open Issues
             </div>
             <div className="text-3xl font-light font-mono tracking-tight text-[#111111]">
-              {unresolvedIncidents.length}
+              {openCount}
             </div>
             <div className="text-[11px] text-neutral-500 mt-2 font-sans">
-              {metrics.activeIncidents.filter(i => i.status === 'RESOLVED').length} issues safely resolved
+              {humanReviewCount} human review, {investigatingCount} investigating, {unresolvedCount} unresolved
             </div>
           </div>
         </div>
@@ -189,7 +199,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
             </h2>
           </div>
           <div className="text-xs font-mono text-neutral-500">
-            Total Monitored: <strong className="text-[#111111] font-bold">{totalRecords} Records</strong>
+            Total Monitored: <strong className="text-[#111111] font-bold">{totalRecords} Records</strong> ({metrics.baselineRecords || 500} baseline{metrics.simulatedRecords ? ` + ${metrics.simulatedRecords} simulated` : ''})
           </div>
         </div>
 
@@ -252,7 +262,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
             </div>
             <div className="p-3 border border-[#E5E5E0] bg-white rounded-xs">
               <div className="text-[10px] text-neutral-500 uppercase">Investigating</div>
-              <div className="text-lg font-bold text-[#111111] mt-0.5">{unresolvedIncidents.length}</div>
+              <div className="text-lg font-bold text-[#111111] mt-0.5">{investigatingCount}</div>
               <div className="text-[10px] text-neutral-500 font-sans">Active diagnostic agent</div>
             </div>
             <div className="p-3 border border-[#E5E5E0] bg-white rounded-xs">
@@ -266,7 +276,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
         {/* Mathematical Check Footnote */}
         <div className="pt-3 border-t border-[#E5E5E0] flex flex-col sm:flex-row sm:items-center justify-between text-[11px] font-mono text-neutral-500 gap-1">
           <div>
-            Identity: {matchedCount} (Matched) + {exceptionCount} (Exceptions) = {totalRecords} Total Records.
+            Identity: {matchedCount} (Matched) + {exceptionCount} (Exceptions) = {totalRecords} Total Records | Exceptions: {resolvedCount} (AI Resolved) + {humanReviewCount} (Human Review) + {investigatingCount} (Investigating) + {unresolvedCount} (Unresolved) = {exceptionCount} Total Exceptions.
           </div>
           <div className="text-neutral-700 font-medium">
             Status: Fully Accounted

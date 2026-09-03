@@ -62,8 +62,9 @@ export class FinancialStore {
     this.incidents = incidents;
 
     // Build realistic initial state distribution matching Track 04 overview:
-    // 500 total records: 447 Matched, 53 Exceptions
-    // Of the 53 exceptions: 38 AI Resolved, 10 Human Review, 5 Unresolved
+    // 500 total records: 367 Matched, 133 Exceptions
+    // Of the 133 exceptions: 38 AI Resolved, 10 Human Review, 7 Investigating, 78 Unresolved
+    // Open Issues = Human Review (10) + Investigating (7) + Unresolved (78) = 95
     this.auditLogs = [];
     this.bootstrapInitialResolutions();
   }
@@ -74,6 +75,7 @@ export class FinancialStore {
     // Sort so resolutions are consistent
     let resolvedCount = 0;
     let reviewCount = 0;
+    let investigatingCount = 0;
     let unresolvedCount = 0;
 
     const baseTime = new Date('2026-08-25T12:00:00.000Z').getTime();
@@ -83,8 +85,9 @@ export class FinancialStore {
       const logTime = new Date(baseTime + i * 45000).toISOString();
 
       if (i < 38) {
-        // AI Resolved
+        // AI Resolved (38 cases)
         rec.status = 'AI_RESOLVED';
+        rec.issueStatus = 'RESOLVED';
         rec.actionTaken = rec.exceptionType === 'DUPLICATE_PAYMENT' ? 'Initiated Duplicate Refund Review'
           : rec.exceptionType === 'SETTLEMENT_MISMATCH' ? 'Auto-Adjusted Settlement Variance'
           : rec.exceptionType === 'DELAYED_EVENT' ? 'Event Synced & Reconciled'
@@ -109,6 +112,7 @@ export class FinancialStore {
       } else if (i < 48) {
         // Human Review Required (10 cases)
         rec.status = 'HUMAN_REVIEW';
+        rec.issueStatus = 'HUMAN_REVIEW';
         reviewCount++;
 
         this.auditLogs.push({
@@ -125,9 +129,30 @@ export class FinancialStore {
           status: 'WARNING',
           operator: 'AI Controller'
         });
+      } else if (i < 55) {
+        // Investigating (7 cases: i from 48 to 54)
+        rec.status = 'INVESTIGATING';
+        rec.issueStatus = 'INVESTIGATING';
+        investigatingCount++;
+
+        this.auditLogs.push({
+          id: `AUD-${String(5000 + i)}`,
+          timestamp: logTime,
+          entityId: rec.id,
+          entityType: 'INVESTIGATION',
+          event: `AI Investigation In Progress: ${rec.exceptionType}`,
+          aiDecision: `Automated diagnostic agent analyzing multi-ledger logs, settlement UTRs, and payment provider webhooks.`,
+          evidence: [`Payment: ${rec.paymentId}`, `Order: ${rec.orderId}`, `Impact Amount: ₹${rec.actualAmount}`],
+          policyResult: 'POL-03: Active Diagnostic Agent Analysis',
+          actionTaken: 'Correlating Ledger Signals & Verification Rules',
+          verificationResult: 'Diagnostics executing across 5-rule invariant engine.',
+          status: 'WARNING',
+          operator: 'AI Controller'
+        });
       } else {
-        // Unresolved (5 cases)
+        // Unresolved (78 cases: i from 55 to 132)
         rec.status = 'UNRESOLVED';
+        rec.issueStatus = 'UNRESOLVED';
         unresolvedCount++;
 
         this.auditLogs.push({
@@ -152,9 +177,11 @@ export class FinancialStore {
       const incRecords = this.records.filter(r => inc.affectedRecordIds.includes(r.id));
       const allResolved = incRecords.every(r => r.status === 'AI_RESOLVED' || r.status === 'MATCHED');
       const hasReview = incRecords.some(r => r.status === 'HUMAN_REVIEW');
+      const hasInvestigating = incRecords.some(r => r.status === 'INVESTIGATING');
       
       if (allResolved) inc.status = 'RESOLVED';
       else if (hasReview) inc.status = 'HUMAN_REVIEW_REQUIRED';
+      else if (hasInvestigating) inc.status = 'INVESTIGATING';
       else inc.status = 'OPEN';
     }
   }
@@ -167,11 +194,21 @@ export class FinancialStore {
     const matchedCount = this.records.filter(r => r.status === 'MATCHED').length;
     const resolvedRecords = this.records.filter(r => r.status === 'AI_RESOLVED');
     const humanReviewRecords = this.records.filter(r => r.status === 'HUMAN_REVIEW');
-    const unresolvedRecords = this.records.filter(r => r.status === 'UNRESOLVED' || r.status === 'EXCEPTION' || r.status === 'MISMATCH');
+    const investigatingRecords = this.records.filter(r => r.status === 'INVESTIGATING' || r.issueStatus === 'INVESTIGATING');
+    const unresolvedRecords = exceptions.filter(r => 
+      r.status !== 'AI_RESOLVED' && 
+      r.status !== 'HUMAN_REVIEW' && 
+      r.status !== 'INVESTIGATING' && 
+      r.issueStatus !== 'INVESTIGATING'
+    );
 
     const amountAffected = exceptions.reduce((sum, r) => sum + r.actualAmount, 0);
     const resolvedAmount = resolvedRecords.reduce((sum, r) => sum + r.actualAmount, 0);
     const unresolvedAmount = (amountAffected - resolvedAmount);
+
+    const openIncidents = this.incidents.filter(i => i.status !== 'RESOLVED');
+    const resolvedIncidents = this.incidents.filter(i => i.status === 'RESOLVED');
+    const openCount = humanReviewRecords.length + investigatingRecords.length + unresolvedRecords.length;
 
     return {
       totalProcessed,
@@ -180,11 +217,18 @@ export class FinancialStore {
       resolvedAmount,
       unresolvedAmount,
       totalRecords: this.records.length,
+      baselineRecords: 500,
+      simulatedRecords: Math.max(0, this.records.length - 500),
       matchedCount,
       exceptionCount: exceptions.length,
       resolvedCount: resolvedRecords.length,
       humanReviewCount: humanReviewRecords.length,
+      investigatingCount: investigatingRecords.length,
       unresolvedCount: unresolvedRecords.length,
+      openCount,
+      openIncidentsCount: openIncidents.length,
+      resolvedIncidentsCount: resolvedIncidents.length,
+      totalIncidentsCount: this.incidents.length,
       activeIncidents: this.incidents,
       recentAuditLogs: this.auditLogs.slice(-8).reverse()
     };
@@ -264,6 +308,8 @@ export class FinancialStore {
     return {
       dataset: {
         totalRecords,
+        baselineRecords: 500,
+        simulatedRecords: Math.max(0, totalRecords - 500),
         normalRecords,
         injectedAnomalies: groundTruthAnomalies,
         anomalyRatio: Math.round((groundTruthAnomalies / totalRecords) * 1000) / 10
@@ -767,6 +813,80 @@ export class FinancialStore {
         expectedResolution: 'Notify merchant of underpayment / balance invoice'
       });
 
+    } else if (anomalyType === 'DUPLICATE_WEBHOOK') {
+      const order: Order = {
+        id: orderId,
+        customerId: customer.id,
+        amount,
+        currency: 'INR',
+        receipt: `rcpt_sim_${nextIdx}`,
+        status: 'paid',
+        createdAt: timeStr,
+        itemsSummary: 'Cloud Analytics Pro Plan (Simulated)'
+      };
+      this.orders.unshift(order);
+
+      const pFee = Math.round(amount * 0.02);
+      const pTax = Math.round(pFee * 0.18);
+      const payment: Payment = {
+        id: paymentId,
+        orderId,
+        customerId: customer.id,
+        amount,
+        fee: pFee,
+        tax: pTax,
+        netAmount: amount - (pFee + pTax),
+        status: 'captured',
+        method: 'upi',
+        methodDetails: 'Google Pay UPI @okaxis',
+        createdAt: timeStr,
+        capturedAt: timeStr,
+        bankRrn: `7719283001${nextIdx % 100}`,
+        isDuplicate: false
+      };
+      this.payments.unshift(payment);
+
+      this.settlements.unshift({
+        id: `setl_sim_${Date.now().toString().slice(-6)}`,
+        paymentIds: [paymentId],
+        grossAmount: amount,
+        feesDeducted: pFee,
+        taxDeducted: pTax,
+        netSettled: amount - (pFee + pTax),
+        utr: `HDFCN${Math.floor(Math.random() * 89999999 + 10000000)}`,
+        status: 'settled',
+        settledAt: timeStr
+      });
+
+      this.events.unshift(
+        {
+          id: `evt_sim_${Date.now()}_1`,
+          event: 'payment.captured',
+          entityId: paymentId,
+          timestamp: timeStr,
+          deliveryStatus: 'delivered',
+          latencyMs: 90,
+          payloadSnippet: JSON.stringify({ id: paymentId, amount, status: 'captured', idempotency_key: `idem_${paymentId}` })
+        },
+        {
+          id: `evt_sim_${Date.now()}_2`,
+          event: 'payment.captured',
+          entityId: paymentId,
+          timestamp: retryTimeStr,
+          deliveryStatus: 'duplicate',
+          latencyMs: 110,
+          payloadSnippet: JSON.stringify({ id: paymentId, amount, status: 'captured', idempotency_key: `idem_${paymentId}` })
+        }
+      );
+
+      difference = 0;
+      exceptionDescription = `Identical payment.captured webhook payload and idempotency signature received twice within 1500ms.`;
+      this.anomalyMap.set(paymentId, {
+        type: 'DUPLICATE_WEBHOOK',
+        description: exceptionDescription,
+        expectedResolution: 'Deduplicate event stream and acknowledge webhook with zero ledger impact'
+      });
+
     } else {
       difference = amount;
       exceptionDescription = `Synthetic financial inconsistency detected for payment ${paymentId}.`;
@@ -854,6 +974,13 @@ export class FinancialStore {
     evidence?: { event: string; detail: string; status: 'ok' | 'warning' | 'critical' }[];
     rootCause?: string;
     recommendedAction?: string;
+    capitalLocation?: {
+      status: string;
+      badge: string;
+      location: string;
+      holdingEntity: string;
+      description: string;
+    };
   } | null {
     const q = queryId.trim().toLowerCase();
     
@@ -1095,6 +1222,49 @@ export class FinancialStore {
       recommendedAction = 'No action required. All ledger entries balanced.';
     }
 
+    // Determine where the capital is right now
+    let capitalLocation = {
+      status: 'CAPTURED',
+      badge: 'Captured by Razorpay',
+      location: 'Razorpay Nodal Escrow Account',
+      holdingEntity: 'Razorpay Payment Gateway (Escrow)',
+      description: 'Capital successfully captured from customer bank switch, held in nodal escrow awaiting settlement cut-off.'
+    };
+
+    if (refund && refund.status === 'processed') {
+      capitalLocation = {
+        status: 'REFUNDED',
+        badge: 'Refunded to Customer',
+        location: `Customer Account (${payment?.methodDetails || 'Source VPA'})`,
+        holdingEntity: 'Customer Issuing Bank',
+        description: `₹${refund.amount.toLocaleString('en-IN')} was reversed and credited back to the customer's payment source.`
+      };
+    } else if (settlement && settlement.status === 'settled') {
+      capitalLocation = {
+        status: 'SETTLED',
+        badge: 'Settled to Merchant',
+        location: `Merchant Bank Account (UTR: ${settlement.utr})`,
+        holdingEntity: 'Merchant Designated Bank Account',
+        description: `Net payout of ₹${settlement.netSettled.toLocaleString('en-IN')} has been transferred to merchant bank account via ${settlement.utr}.`
+      };
+    } else if (record && (record.status === 'EXCEPTION' || record.status === 'UNRESOLVED' || record.status === 'MISMATCH' || record.issueStatus === 'DETECTED' || record.issueStatus === 'HUMAN_REVIEW')) {
+      capitalLocation = {
+        status: 'HELD_IN_EXCEPTION',
+        badge: 'Held in Exception Queue',
+        location: 'Razorpay Exception Reserve Ledger',
+        holdingEntity: 'Razorpay Risk & Settlement Control',
+        description: `Capital held in exception queue due to detected variance (${record.exceptionType.replace(/_/g, ' ')}). Settlement suspended until resolved.`
+      };
+    } else if (payment && payment.status === 'failed') {
+      capitalLocation = {
+        status: 'FAILED_RETAINED',
+        badge: 'With Customer Bank',
+        location: 'Customer Bank Account',
+        holdingEntity: 'Customer Issuing Bank',
+        description: 'Payment failed at bank gateway. No funds debited or auto-reversed by switch.'
+      };
+    }
+
     return {
       customer,
       order,
@@ -1108,7 +1278,8 @@ export class FinancialStore {
       whatHappened,
       evidence: evidenceItems,
       rootCause,
-      recommendedAction
+      recommendedAction,
+      capitalLocation
     };
   }
 }

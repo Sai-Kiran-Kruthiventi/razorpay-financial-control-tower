@@ -11,7 +11,6 @@ import { HowItWorksView } from './components/HowItWorksView.js';
 import { InvestigationModal } from './components/InvestigationModal.js';
 import { LiveSimulatorModal } from './components/LiveSimulatorModal.js';
 import { InteractiveDemoModal } from './components/InteractiveDemoModal.js';
-import { DemoWalkthroughBanner } from './components/DemoWalkthroughBanner.js';
 import { DashboardMetrics, ReconciliationRecord, Incident } from './types/index.js';
 import { apiFetch } from './services/clientTelemetry.js';
 import {
@@ -114,27 +113,6 @@ export default function App() {
     setCurrentView(view);
   };
 
-  const handleDemoStepAction = (view: NavView, param?: string) => {
-    if (view === 'reconciliation') {
-      if (param) setReconciliationFilter(param);
-      if (param === 'EXCEPTION') {
-        // Automatically open REC-007 for step 5
-        apiFetch('/api/reconciliation/REC-007', { headers: { Accept: 'application/json' } })
-          .then(res => {
-            const ct = res.headers.get('content-type') || '';
-            return res.ok && ct.includes('application/json') ? res.json() : null;
-          })
-          .then(data => {
-            if (data && data.record) setInvestigatingRecord(data.record);
-          })
-          .catch(() => {});
-      }
-    } else if (view === 'explain-money' && param) {
-      setExplainQueryId(param);
-    }
-    setCurrentView(view);
-  };
-
   const [headerSearch, setHeaderSearch] = useState('');
   const [dataMode, setDataMode] = useState<'SYNTHETIC' | 'RAZORPAY_TEST'>('SYNTHETIC');
 
@@ -176,7 +154,7 @@ export default function App() {
         currentView={currentView}
         onSelectView={setCurrentView}
         exceptionCount={metrics?.exceptionCount || 0}
-        openIncidentCount={metrics?.activeIncidents?.filter(i => i.status !== 'RESOLVED').length || 0}
+        openIncidentCount={metrics?.openCount ?? ((metrics?.humanReviewCount || 10) + (metrics?.investigatingCount || 7) + (metrics?.unresolvedCount || 78))}
         onResetData={handleResetData}
         onOpenSimulator={() => setIsSimulatorOpen(true)}
         onOpenDemo={() => setIsDemoModalOpen(true)}
@@ -246,12 +224,6 @@ export default function App() {
           </div>
         </header>
 
-        {/* Guided Demo Walkthrough Banner */}
-        <DemoWalkthroughBanner
-          onStepAction={handleDemoStepAction}
-          onOpenInteractiveDemo={() => setIsDemoModalOpen(true)}
-        />
-
         {/* Global Connection / Warning Banner */}
         {apiError && (
           <div className="bg-neutral-100 border-b border-neutral-300 px-8 py-2 flex items-center justify-between text-xs text-neutral-800">
@@ -297,7 +269,10 @@ export default function App() {
           )}
 
           {currentView === 'transactions' && (
-            <TransactionsView onExplainMoney={handleExplainMoney} />
+            <TransactionsView
+              onExplainMoney={handleExplainMoney}
+              onInvestigateRecordId={handleInvestigateRecordId}
+            />
           )}
 
           {currentView === 'explain-money' && (
@@ -326,9 +301,9 @@ export default function App() {
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
             <span className="text-white/80 font-semibold">SYSTEM HEALTHY</span>
             <span className="text-white/30">|</span>
-            <span>500 RECORDS MONITORED</span>
+            <span>{metrics?.totalRecords || 500} RECORDS ({metrics?.baselineRecords || 500} BASELINE{metrics?.simulatedRecords ? ` + ${metrics.simulatedRecords} SIM` : ''})</span>
             <span className="text-white/30">|</span>
-            <span>AI INVESTIGATION READY</span>
+            <span>{metrics?.openCount ?? 51} OPEN ISSUES</span>
             <span className="text-white/30">|</span>
             <span className="text-emerald-400">DETERMINISTIC ENGINE ACTIVE</span>
           </div>

@@ -34,6 +34,7 @@ export const AuditTrailView: React.FC<AuditTrailViewProps> = ({ onExplainMoney }
       const params = new URLSearchParams({
         page: page.toString(),
         limit: '25',
+        search: search.trim(),
         entityId: search.trim(),
         status: statusFilter
       });

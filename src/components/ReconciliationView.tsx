@@ -35,13 +35,36 @@ export const ReconciliationView: React.FC<ReconciliationViewProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
+  const [isReconciling, setIsReconciling] = useState(false);
+  const [reconBanner, setReconBanner] = useState<string | null>(null);
 
   const totalCount = metrics?.totalRecords ?? 500;
   const matchedCount = metrics?.matchedCount ?? 367;
   const exceptionCount = metrics?.exceptionCount ?? 133;
   const resolvedCount = metrics?.resolvedCount ?? 38;
   const humanReviewCount = metrics?.humanReviewCount ?? 10;
-  const unresolvedCount = metrics?.unresolvedCount ?? Math.max(0, exceptionCount - resolvedCount - humanReviewCount);
+  const investigatingCount = metrics?.investigatingCount ?? 7;
+  const unresolvedCount = metrics?.unresolvedCount ?? 78;
+  const pendingVerification = humanReviewCount + investigatingCount + unresolvedCount;
+
+  const handleRunFullReconciliation = async () => {
+    setIsReconciling(true);
+    try {
+      const res = await apiFetch('/api/reconciliation/run', { method: 'POST' });
+      if (res.ok) {
+        const data = await res.json();
+        setReconBanner(
+          `Reconciliation engine executed successfully: ${data.summary.matchedRecords} matched, ${data.summary.discrepancies} active discrepancies verified across ${data.summary.totalRecords} records.`
+        );
+        await fetchRecords();
+      }
+    } catch (err: any) {
+      console.error('Reconciliation run error:', err);
+    } finally {
+      setIsReconciling(false);
+      setTimeout(() => setReconBanner(null), 7000);
+    }
+  };
 
   useEffect(() => {
     if (initialStatusFilter) {
@@ -119,6 +142,12 @@ export const ReconciliationView: React.FC<ReconciliationViewProps> = ({
             HUMAN REVIEW
           </span>
         );
+      case 'INVESTIGATING':
+        return (
+          <span className="inline-flex items-center px-2 py-0.5 rounded-xs text-[10px] font-bold bg-neutral-900 text-white font-mono">
+            INVESTIGATING
+          </span>
+        );
       case 'UNRESOLVED':
         return (
           <span className="inline-flex items-center px-2 py-0.5 rounded-xs text-[10px] font-bold bg-white text-neutral-700 border border-neutral-400 font-mono">
@@ -136,6 +165,7 @@ export const ReconciliationView: React.FC<ReconciliationViewProps> = ({
     { id: 'MATCHED', label: 'Matched' },
     { id: 'AI_RESOLVED', label: 'AI Resolved' },
     { id: 'HUMAN_REVIEW', label: 'Human Review' },
+    { id: 'INVESTIGATING', label: 'Investigating' },
     { id: 'UNRESOLVED', label: 'Unresolved' }
   ];
 
@@ -172,11 +202,11 @@ export const ReconciliationView: React.FC<ReconciliationViewProps> = ({
             Reconciliation Overview: {totalCount} Records
           </span>
           <span className="text-neutral-500 text-[11px]">
-            Identity Check: {matchedCount} Matched + {exceptionCount} Exceptions = {totalCount}
+            Identity Check: {matchedCount} Matched + {exceptionCount} Exceptions = {totalCount} | Exceptions: {resolvedCount} AI Resolved + {humanReviewCount} Human Review + {investigatingCount} Investigating + {unresolvedCount} Unresolved = {exceptionCount}
           </span>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 text-xs font-mono">
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 text-xs font-mono">
           <button
             onClick={() => { setStatusFilter('ALL'); setPage(1); }}
             className={`p-2.5 rounded-xs border text-left transition-colors cursor-pointer ${
@@ -225,6 +255,16 @@ export const ReconciliationView: React.FC<ReconciliationViewProps> = ({
           >
             <div className="text-[10px] text-neutral-500 uppercase">Human Review</div>
             <div className="text-base font-bold mt-0.5">{humanReviewCount}</div>
+          </button>
+
+          <button
+            onClick={() => { setStatusFilter('INVESTIGATING'); setPage(1); }}
+            className={`p-2.5 rounded-xs border text-left transition-colors cursor-pointer ${
+              statusFilter === 'INVESTIGATING' ? 'bg-black text-white border-black' : 'bg-[#F8F8F6] border-[#E5E5E0] text-neutral-800 hover:bg-neutral-100'
+            }`}
+          >
+            <div className="text-[10px] text-neutral-500 uppercase">Investigating</div>
+            <div className="text-base font-bold mt-0.5">{investigatingCount}</div>
           </button>
 
           <button

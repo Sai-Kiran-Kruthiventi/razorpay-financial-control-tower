@@ -267,11 +267,18 @@ export interface DashboardMetrics {
   resolvedAmount: number;
   unresolvedAmount: number;
   totalRecords: number;
+  baselineRecords?: number;
+  simulatedRecords?: number;
   matchedCount: number;
   exceptionCount: number;
   resolvedCount: number;
   humanReviewCount: number;
+  investigatingCount: number;
   unresolvedCount: number;
+  openCount: number;
+  openIncidentsCount?: number;
+  resolvedIncidentsCount?: number;
+  totalIncidentsCount?: number;
   activeIncidents: Incident[];
   recentAuditLogs: AuditLog[];
 }
@@ -279,6 +286,8 @@ export interface DashboardMetrics {
 export interface EvaluationMetrics {
   dataset: {
     totalRecords: number;
+    baselineRecords?: number;
+    simulatedRecords?: number;
     normalRecords: number;
     injectedAnomalies: number;
     anomalyRatio: number;

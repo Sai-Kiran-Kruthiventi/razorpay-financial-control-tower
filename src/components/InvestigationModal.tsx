@@ -518,10 +518,15 @@ export const InvestigationModal: React.FC<InvestigationModalProps> = ({
           {!isLoading && !isExecuting && !verificationResult && investigation && (
             <div className="space-y-4">
 
-              {/* 1. What happened? */}
-              <div className="border border-[#E5E5E0] rounded-xs p-4 bg-[#F8F8F6] space-y-1.5">
-                <div className="text-[10px] font-mono text-neutral-500 uppercase font-bold tracking-wider">
-                  What Happened?
+              {/* Section A: Deterministic Facts & Mathematical Discrepancy */}
+              <div className="border border-[#E5E5E0] rounded-xs p-4 bg-[#F8F8F6] space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="text-[10px] font-mono text-neutral-500 uppercase font-bold tracking-wider">
+                    Deterministic Ground Truth &amp; Mathematical Discrepancy
+                  </div>
+                  <span className="text-[9px] font-mono font-bold bg-neutral-200 text-neutral-800 px-1.5 py-0.5 rounded-xs">
+                    RULE-BASED INVARIANT
+                  </span>
                 </div>
                 <p className="text-xs text-[#111111] font-sans leading-relaxed">
                   {investigation.whatHappened || `A discrepancy of ${formatRupees(differenceAmount)} was identified between the merchant invoice and payment capture.`}
@@ -534,16 +539,21 @@ export const InvestigationModal: React.FC<InvestigationModalProps> = ({
                 </div>
               </div>
 
-              {/* 2. Why did it happen? */}
+              {/* Section B: AI Reasoning & Root Cause */}
               <div className="border border-[#E5E5E0] rounded-xs p-4 bg-white space-y-1.5">
                 <div className="flex items-center justify-between">
                   <div className="text-[10px] font-mono text-neutral-600 uppercase font-bold tracking-wider flex items-center gap-1.5">
                     <HelpCircle className="w-3.5 h-3.5 text-neutral-800" />
-                    <span>Why Did It Happen? (Root Cause)</span>
+                    <span>AI Reasoning (Root Cause Analysis)</span>
                   </div>
-                  <span className="text-[10px] font-mono text-neutral-700 font-bold bg-neutral-100 px-2 py-0.5 rounded-xs border border-neutral-300">
-                    {Math.round(investigation.confidence * 100)}% Verified Confidence
-                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[9px] font-mono text-neutral-500 hidden sm:inline">
+                      Grounded by gateway trace
+                    </span>
+                    <span className="text-[10px] font-mono text-neutral-700 font-bold bg-neutral-100 px-2 py-0.5 rounded-xs border border-neutral-300">
+                      {Math.round(investigation.confidence * 100)}% Confidence
+                    </span>
+                  </div>
                 </div>
                 <p className="text-xs text-neutral-800 font-sans leading-relaxed">
                   {investigation.whyDidItHappen || investigation.rootCause}

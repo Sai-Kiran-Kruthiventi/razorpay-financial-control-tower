@@ -12,7 +12,7 @@ import {
   Percent
 } from 'lucide-react';
 
-export const EvaluationView: React.FC = () => {
+export const EvaluationView: React.FC<{ dataVersion?: number }> = ({ dataVersion = 0 }) => {
   const [metrics, setMetrics] = useState<EvaluationMetrics | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
@@ -39,7 +39,7 @@ export const EvaluationView: React.FC = () => {
 
   useEffect(() => {
     fetchMetrics();
-  }, []);
+  }, [dataVersion]);
 
   if (fetchError) {
     return (

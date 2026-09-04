@@ -14,11 +14,13 @@ import {
 
 interface AuditTrailViewProps {
   onExplainMoney: (id: string) => void;
+  dataVersion?: number;
 }
 
-export const AuditTrailView: React.FC<AuditTrailViewProps> = ({ onExplainMoney }) => {
+export const AuditTrailView: React.FC<AuditTrailViewProps> = ({ onExplainMoney, dataVersion = 0 }) => {
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [total, setTotal] = useState(0);
+  const [totalAll, setTotalAll] = useState(0);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [search, setSearch] = useState('');
@@ -43,7 +45,8 @@ export const AuditTrailView: React.FC<AuditTrailViewProps> = ({ onExplainMoney }
       if (res.ok && contentType.includes('application/json')) {
         const data = await res.json();
         setLogs(data.logs || []);
-        setTotal(data.total || 0);
+        setTotal(typeof data.total === 'number' ? data.total : 0);
+        setTotalAll(typeof data.totalAll === 'number' ? data.totalAll : (typeof data.total === 'number' ? data.total : 0));
         setTotalPages(data.totalPages || 1);
       } else {
         throw new Error(`Failed to load audit history (Status: ${res.status})`);
@@ -58,7 +61,7 @@ export const AuditTrailView: React.FC<AuditTrailViewProps> = ({ onExplainMoney }
 
   useEffect(() => {
     fetchAuditLogs();
-  }, [page, search, statusFilter]);
+  }, [page, search, statusFilter, dataVersion]);
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
@@ -289,7 +292,7 @@ export const AuditTrailView: React.FC<AuditTrailViewProps> = ({ onExplainMoney }
         {/* Pagination */}
         <div className="p-4 bg-[#F8F8F6] border-t border-[#E5E5E0] flex items-center justify-between text-xs font-mono">
           <span className="text-neutral-500">
-            Showing Page {page} of {totalPages} ({total} recorded ledger entries)
+            Showing {total} of {totalAll} recorded ledger entries (Page {page} of {totalPages})
           </span>
           <div className="flex items-center gap-1">
             <button

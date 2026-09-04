@@ -18,11 +18,13 @@ import {
 
 interface ExplainMoneyProps {
   initialQuery?: string;
+  dataVersion?: number;
   onInvestigate: (record: ReconciliationRecord) => void;
 }
 
 export const ExplainMoneyView: React.FC<ExplainMoneyProps> = ({
   initialQuery = 'pay_80007',
+  dataVersion = 0,
   onInvestigate
 }) => {
   const [query, setQuery] = useState(initialQuery);
@@ -78,7 +80,7 @@ export const ExplainMoneyView: React.FC<ExplainMoneyProps> = ({
       setQuery(initialQuery);
       fetchLifecycle(initialQuery);
     }
-  }, [initialQuery]);
+  }, [initialQuery, dataVersion]);
 
   const sampleQueries = [
     { label: 'Duplicate Payment', id: 'pay_80007', tag: 'Double Charge' },

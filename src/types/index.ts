@@ -299,6 +299,8 @@ export interface EvaluationMetrics {
     recall: number;
     f1Score: number;
     accuracy: number;
+    falsePositiveRate?: number;
+    detectionRate?: number;
   };
   operations: {
     recordsProcessed: number;

@@ -17,6 +17,7 @@ import {
 interface TransactionsViewProps {
   onExplainMoney: (id: string) => void;
   onInvestigateRecordId?: (recordId: string) => void;
+  dataVersion?: number;
 }
 
 interface TransactionItem {
@@ -44,7 +45,8 @@ type FilterOption = 'ALL' | 'CAPTURED' | 'FAILED' | 'REFUNDED' | 'SETTLEMENT_PEN
 
 export const TransactionsView: React.FC<TransactionsViewProps> = ({
   onExplainMoney,
-  onInvestigateRecordId
+  onInvestigateRecordId,
+  dataVersion = 0
 }) => {
   const [transactions, setTransactions] = useState<TransactionItem[]>([]);
   const [search, setSearch] = useState('');
@@ -53,6 +55,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
   const [limit] = useState(25);
   const [totalPages, setTotalPages] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
+  const [totalAll, setTotalAll] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
 
@@ -74,7 +77,8 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
         const data = await res.json();
         setTransactions(data.transactions || []);
         setTotalPages(data.totalPages || 1);
-        setTotalCount(data.total || 0);
+        setTotalCount(typeof data.total === 'number' ? data.total : 0);
+        setTotalAll(typeof data.totalAll === 'number' ? data.totalAll : (typeof data.total === 'number' ? data.total : 0));
       } else {
         throw new Error(`Failed to load transactions (Status: ${res.status})`);
       }
@@ -88,7 +92,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
 
   useEffect(() => {
     fetchTransactions();
-  }, [page, activeFilter, search]);
+  }, [page, activeFilter, search, dataVersion]);
 
   const formatRupees = (amount?: number) => {
     if (typeof amount !== 'number') return '₹0';
@@ -188,7 +192,8 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
 
         <div className="text-xs font-mono text-neutral-500 flex items-center justify-between">
           <span>
-            Displaying <strong className="text-[#111111]">{totalCount}</strong> matching transactions
+            Showing <strong className="text-[#111111]">{totalCount}</strong> of{' '}
+            <strong className="text-[#111111]">{totalAll}</strong> monitored transactions
           </span>
           <span className="text-[11px] text-neutral-400">
             Click any row to view complete money trace
@@ -370,7 +375,8 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
         {/* Pagination Footer */}
         <div className="p-3.5 bg-[#F8F8F6] border-t border-[#E5E5E0] flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs font-mono">
           <span className="text-neutral-600">
-            Page <strong className="text-black">{page}</strong> of <strong className="text-black">{totalPages}</strong> ({totalCount} transactions tracked)
+            Page <strong className="text-black">{page}</strong> of <strong className="text-black">{totalPages}</strong>
+            {' '}(Showing {totalCount} of {totalAll} transactions monitored)
           </span>
 
           <div className="flex items-center gap-1.5 self-end sm:self-auto">

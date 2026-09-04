@@ -58,13 +58,13 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
     }
   };
 
-  const totalRecords = metrics.totalRecords || 500;
-  const matchedCount = metrics.matchedCount || 367;
-  const exceptionCount = metrics.exceptionCount || 133;
-  const resolvedCount = metrics.resolvedCount ?? 38;
-  const humanReviewCount = metrics.humanReviewCount ?? 10;
-  const investigatingCount = metrics.investigatingCount ?? 7;
-  const unresolvedCount = metrics.unresolvedCount ?? 78;
+  const totalRecords = metrics.totalRecords ?? 0;
+  const matchedCount = metrics.matchedCount ?? 0;
+  const exceptionCount = metrics.exceptionCount ?? 0;
+  const resolvedCount = metrics.resolvedCount ?? 0;
+  const humanReviewCount = metrics.humanReviewCount ?? 0;
+  const investigatingCount = metrics.investigatingCount ?? 0;
+  const unresolvedCount = metrics.unresolvedCount ?? 0;
   const openCount = metrics.openCount ?? (humanReviewCount + investigatingCount + unresolvedCount);
 
   // Single source of truth for active unresolved incidents requiring operational attention
@@ -126,7 +126,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
         <div className="text-[10px] text-neutral-500 uppercase font-mono tracking-widest font-bold mb-2.5 flex items-center justify-between">
           <span>Primary Financial Metrics</span>
           <span className="font-mono text-neutral-400">
-            {metrics.baselineRecords || 500} Baseline Records
+            {metrics.baselineRecords ?? totalRecords} Baseline Records
             {metrics.simulatedRecords ? ` + ${metrics.simulatedRecords} Simulated` : ''} 
             {' '}(Total Monitored: {totalRecords})
           </span>
@@ -141,7 +141,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
               {formatLakhs(totalProcessed)}
             </div>
             <div className="text-[11px] text-neutral-500 mt-2 font-sans">
-              {metrics.baselineRecords || 500} baseline {metrics.simulatedRecords ? `+ ${metrics.simulatedRecords} simulated ` : ''}transactions
+              {metrics.baselineRecords ?? totalRecords} baseline {metrics.simulatedRecords ? `+ ${metrics.simulatedRecords} simulated ` : ''}transactions
             </div>
           </div>
 
@@ -199,7 +199,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
             </h2>
           </div>
           <div className="text-xs font-mono text-neutral-500">
-            Total Monitored: <strong className="text-[#111111] font-bold">{totalRecords} Records</strong> ({metrics.baselineRecords || 500} baseline{metrics.simulatedRecords ? ` + ${metrics.simulatedRecords} simulated` : ''})
+            Total Monitored: <strong className="text-[#111111] font-bold">{totalRecords} Records</strong> ({metrics.baselineRecords ?? totalRecords} baseline{metrics.simulatedRecords ? ` + ${metrics.simulatedRecords} simulated` : ''})
           </div>
         </div>
 

@@ -514,6 +514,7 @@ export async function handleClientApiRequest(urlString: string, options?: Reques
       );
     }
 
+    const totalAll = clientStore.payments.length;
     const total = txs.length;
     const startIndex = (page - 1) * limit;
     const paginated = txs.slice(startIndex, startIndex + limit);
@@ -521,9 +522,10 @@ export async function handleClientApiRequest(urlString: string, options?: Reques
     return createJsonResponse({
       transactions: paginated,
       total,
+      totalAll,
       page,
       limit,
-      totalPages: Math.ceil(total / limit)
+      totalPages: Math.max(1, Math.ceil(total / limit))
     });
   }
 
@@ -720,6 +722,64 @@ export async function handleClientApiRequest(urlString: string, options?: Reques
   }
 
   // 9c. Issues list
+function getDefaultRecommendedAction(r: { exceptionType?: string; actualAmount: number }) {
+  const type = r.exceptionType || '';
+  if (type === 'DUPLICATE_PAYMENT') {
+    return {
+      id: 'ACT-AUTO',
+      type: 'INITIATE_REFUND_REVIEW',
+      label: 'Refund Duplicate Payment',
+      description: 'Issue automatic refund reversal back to customer source account.',
+      autoExecutable: r.actualAmount <= 5000
+    };
+  } else if (type === 'SETTLEMENT_MISMATCH') {
+    return {
+      id: 'ACT-AUTO',
+      type: 'ADJUST_SETTLEMENT_FEE',
+      label: 'Adjust Settlement Fee Variance',
+      description: 'Post balancing entry to clear nodal settlement fee discrepancy.',
+      autoExecutable: r.actualAmount <= 5000
+    };
+  } else if (
+    type === 'DELAYED_EVENT' ||
+    type === 'DUPLICATE_WEBHOOK' ||
+    type === 'OUT_OF_ORDER_EVENT' ||
+    type === 'MISSING_EVENT'
+  ) {
+    return {
+      id: 'ACT-AUTO',
+      type: 'MARK_RECONCILED',
+      label: 'Sync Event & Mark Reconciled',
+      description: 'Synchronize delayed webhook event timeline with bank gateway RRN timestamp.',
+      autoExecutable: true
+    };
+  } else if (type === 'PAYMENT_AMOUNT_MISMATCH') {
+    return {
+      id: 'ACT-AUTO',
+      type: 'NOTIFY_MERCHANT',
+      label: 'Notify Merchant of Invoice Variance',
+      description: 'Dispatch invoice adjustment notice to synchronize order and payment ledger.',
+      autoExecutable: r.actualAmount <= 5000
+    };
+  } else if (type === 'REFUND_MISMATCH') {
+    return {
+      id: 'ACT-AUTO',
+      type: 'INITIATE_REFUND_REVIEW',
+      label: 'Review Refund Ledger Overage',
+      description: 'Adjust refund ledger entry to match payment capture amount.',
+      autoExecutable: r.actualAmount <= 5000
+    };
+  } else {
+    return {
+      id: 'ACT-AUTO',
+      type: 'ESCALATE_HUMAN',
+      label: 'Escalate for Human Review',
+      description: 'Escalate to Senior Finance Controller for dual-control authorization.',
+      autoExecutable: false
+    };
+  }
+}
+
   if (pathname === '/issues' && method === 'GET') {
     const status = parsedUrl.searchParams.get('status');
     const filter = parsedUrl.searchParams.get('filter');
@@ -767,13 +827,7 @@ export async function handleClientApiRequest(urlString: string, options?: Reques
             reason: r.actualAmount > 5000 ? 'Amount exceeds ₹5,000 auto-execution ceiling' : 'Amount within ₹5,000 threshold for autonomous action',
             thresholdAmount: 5000
           },
-          recommendedAction: r.investigation?.recommendedAction || {
-            id: 'ACT-AUTO',
-            type: r.exceptionType === 'REFUND_MISMATCH' ? 'INITIATE_REFUND_REVIEW' : 'RECORD_DISCREPANCY_NOTE',
-            label: r.exceptionType === 'REFUND_MISMATCH' ? 'Review and adjust refund ledger' : 'Reconcile gateway variance',
-            description: 'Autonomous financial action compliant with dual-control policy.',
-            autoExecutable: r.actualAmount <= 5000
-          },
+          recommendedAction: r.investigation?.recommendedAction || getDefaultRecommendedAction(r),
           createdTime: r.reconciledAt,
           resolvedAt: r.resolvedAt,
           investigation: r.investigation,
@@ -831,6 +885,7 @@ export async function handleClientApiRequest(urlString: string, options?: Reques
     const page = parsedUrl.searchParams.get('page') || '1';
     const limit = parsedUrl.searchParams.get('limit') || '30';
 
+    const totalAll = clientStore.auditLogs.length;
     let logs = [...clientStore.auditLogs].reverse();
 
     const queryTerm = (search || entityId || '').trim().toLowerCase();
@@ -858,9 +913,10 @@ export async function handleClientApiRequest(urlString: string, options?: Reques
 
     return createJsonResponse({
       total,
+      totalAll,
       page: p,
       limit: l,
-      totalPages: Math.ceil(total / l),
+      totalPages: Math.max(1, Math.ceil(total / l)),
       logs: paginated
     });
   }

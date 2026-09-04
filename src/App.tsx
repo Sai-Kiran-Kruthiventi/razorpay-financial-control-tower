@@ -37,6 +37,10 @@ export default function App() {
   const [isResetting, setIsResetting] = useState(false);
   const [lastRefreshed, setLastRefreshed] = useState<Date>(new Date());
   const [apiError, setApiError] = useState<string | null>(null);
+  // Bumped after every mutation so child views refetch without a browser reload
+  const [dataVersion, setDataVersion] = useState(0);
+
+  const bumpDataVersion = () => setDataVersion(v => v + 1);
 
   const fetchMetrics = async () => {
     try {
@@ -56,6 +60,11 @@ export default function App() {
     }
   };
 
+  const refreshAll = async () => {
+    await fetchMetrics();
+    bumpDataVersion();
+  };
+
   useEffect(() => {
     fetchMetrics();
     const interval = setInterval(fetchMetrics, 15000);
@@ -66,7 +75,7 @@ export default function App() {
     setIsResetting(true);
     try {
       await apiFetch('/api/reset-data', { method: 'POST', headers: { Accept: 'application/json' } });
-      await fetchMetrics();
+      await refreshAll();
       setCurrentView('overview');
     } catch (err) {
       console.error('Failed to reset dataset:', err);
@@ -154,7 +163,8 @@ export default function App() {
         currentView={currentView}
         onSelectView={setCurrentView}
         exceptionCount={metrics?.exceptionCount || 0}
-        openIncidentCount={metrics?.openCount ?? ((metrics?.humanReviewCount || 10) + (metrics?.investigatingCount || 7) + (metrics?.unresolvedCount || 78))}
+        openIncidentCount={metrics?.openCount ?? 0}
+        totalRecords={metrics?.totalRecords ?? 0}
         onResetData={handleResetData}
         onOpenSimulator={() => setIsSimulatorOpen(true)}
         onOpenDemo={() => setIsDemoModalOpen(true)}
@@ -255,6 +265,7 @@ export default function App() {
             <ReconciliationView
               initialStatusFilter={reconciliationFilter}
               metrics={metrics}
+              dataVersion={dataVersion}
               onInvestigate={handleInvestigateRecord}
               onExplainMoney={handleExplainMoney}
               onApproveAction={handleInvestigateRecord}
@@ -263,6 +274,7 @@ export default function App() {
 
           {currentView === 'incidents' && (
             <IncidentsView
+              dataVersion={dataVersion}
               onInvestigateRecordId={handleInvestigateRecordId}
               onExplainMoney={handleExplainMoney}
             />
@@ -270,6 +282,7 @@ export default function App() {
 
           {currentView === 'transactions' && (
             <TransactionsView
+              dataVersion={dataVersion}
               onExplainMoney={handleExplainMoney}
               onInvestigateRecordId={handleInvestigateRecordId}
             />
@@ -278,12 +291,13 @@ export default function App() {
           {currentView === 'explain-money' && (
             <ExplainMoneyView
               initialQuery={explainQueryId}
+              dataVersion={dataVersion}
               onInvestigate={handleInvestigateRecord}
             />
           )}
 
           {currentView === 'audit' && (
-            <AuditTrailView onExplainMoney={handleExplainMoney} />
+            <AuditTrailView dataVersion={dataVersion} onExplainMoney={handleExplainMoney} />
           )}
 
           {currentView === 'how-it-works' && (
@@ -291,7 +305,7 @@ export default function App() {
           )}
 
           {currentView === 'evaluation' && (
-            <EvaluationView />
+            <EvaluationView dataVersion={dataVersion} />
           )}
         </main>
 
@@ -301,9 +315,9 @@ export default function App() {
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
             <span className="text-white/80 font-semibold">SYSTEM HEALTHY</span>
             <span className="text-white/30">|</span>
-            <span>{metrics?.totalRecords || 500} RECORDS ({metrics?.baselineRecords || 500} BASELINE{metrics?.simulatedRecords ? ` + ${metrics.simulatedRecords} SIM` : ''})</span>
+            <span>{metrics?.totalRecords ?? 0} RECORDS ({metrics?.baselineRecords ?? 0} BASELINE{metrics?.simulatedRecords ? ` + ${metrics.simulatedRecords} SIM` : ''})</span>
             <span className="text-white/30">|</span>
-            <span>{metrics?.openCount ?? 51} OPEN ISSUES</span>
+            <span>{metrics?.openCount ?? 0} OPEN ISSUES</span>
             <span className="text-white/30">|</span>
             <span className="text-emerald-400">DETERMINISTIC ENGINE ACTIVE</span>
           </div>
@@ -322,7 +336,7 @@ export default function App() {
           record={investigatingRecord}
           onClose={() => setInvestigatingRecord(null)}
           onActionComplete={() => {
-            fetchMetrics();
+            refreshAll();
           }}
         />
       )}
@@ -333,7 +347,7 @@ export default function App() {
           isOpen={isDemoModalOpen}
           onClose={() => setIsDemoModalOpen(false)}
           onComplete={() => {
-            fetchMetrics();
+            refreshAll();
           }}
         />
       )}
@@ -343,15 +357,15 @@ export default function App() {
         <LiveSimulatorModal
           onClose={() => {
             setIsSimulatorOpen(false);
-            fetchMetrics();
+            refreshAll();
           }}
           onSimulated={rec => {
-            fetchMetrics();
+            refreshAll();
           }}
           onNavigateView={view => {
             setIsSimulatorOpen(false);
             setCurrentView(view);
-            fetchMetrics();
+            refreshAll();
           }}
         />
       )}

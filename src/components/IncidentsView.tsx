@@ -65,13 +65,15 @@ interface IssueCounts {
 interface IncidentsViewProps {
   onInvestigateRecordId: (recordId: string) => void;
   onExplainMoney: (paymentId: string) => void;
+  dataVersion?: number;
 }
 
 type FilterTab = 'ALL' | 'OPEN' | 'HUMAN_REVIEW' | 'HIGH_SEVERITY' | 'RESOLVED';
 
 export const IncidentsView: React.FC<IncidentsViewProps> = ({
   onInvestigateRecordId,
-  onExplainMoney
+  onExplainMoney,
+  dataVersion = 0
 }) => {
   const [issues, setIssues] = useState<IssueItem[]>([]);
   const [counts, setCounts] = useState<IssueCounts>({
@@ -131,7 +133,7 @@ export const IncidentsView: React.FC<IncidentsViewProps> = ({
 
   useEffect(() => {
     fetchIssues();
-  }, [activeFilter, search]);
+  }, [activeFilter, search, dataVersion]);
 
   const formatRupees = (amount?: number) => {
     if (typeof amount !== 'number') return '₹0';

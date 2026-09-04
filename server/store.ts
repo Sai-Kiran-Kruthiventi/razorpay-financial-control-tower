@@ -61,22 +61,23 @@ export class FinancialStore {
     this.records = updatedRecords;
     this.incidents = incidents;
 
-    // Build realistic initial state distribution matching Track 04 overview:
-    // 500 total records: 367 Matched, 133 Exceptions
-    // Of the 133 exceptions: 38 AI Resolved, 10 Human Review, 7 Investigating, 78 Unresolved
-    // Open Issues = Human Review (10) + Investigating (7) + Unresolved (78) = 95
+    // Bootstrap a realistic operational state distribution from ACTUAL exception count
+    // (resolved / human-review / investigating / unresolved). Never hardcode matched/exception totals.
     this.auditLogs = [];
     this.bootstrapInitialResolutions();
   }
 
   private bootstrapInitialResolutions() {
     const exceptions = this.records.filter(r => r.status !== 'MATCHED');
-    
-    // Sort so resolutions are consistent
-    let resolvedCount = 0;
-    let reviewCount = 0;
-    let investigatingCount = 0;
-    let unresolvedCount = 0;
+
+    // Distribute resolution states proportionally from the real exception set:
+    // ~29% AI Resolved, ~8% Human Review, ~5% Investigating, remainder Unresolved
+    const resolvedTarget = Math.min(exceptions.length, Math.round(exceptions.length * 0.29));
+    const reviewTarget = Math.min(exceptions.length - resolvedTarget, Math.max(1, Math.round(exceptions.length * 0.08)));
+    const investigatingTarget = Math.min(
+      exceptions.length - resolvedTarget - reviewTarget,
+      Math.max(1, Math.round(exceptions.length * 0.05))
+    );
 
     const baseTime = new Date('2026-08-25T12:00:00.000Z').getTime();
 
@@ -84,8 +85,8 @@ export class FinancialStore {
       const rec = exceptions[i];
       const logTime = new Date(baseTime + i * 45000).toISOString();
 
-      if (i < 38) {
-        // AI Resolved (38 cases)
+      if (i < resolvedTarget) {
+        // AI Resolved
         rec.status = 'AI_RESOLVED';
         rec.issueStatus = 'RESOLVED';
         rec.actionTaken = rec.exceptionType === 'DUPLICATE_PAYMENT' ? 'Initiated Duplicate Refund Review'
@@ -93,7 +94,6 @@ export class FinancialStore {
           : rec.exceptionType === 'DELAYED_EVENT' ? 'Event Synced & Reconciled'
           : 'Reconciliation Policy Applied';
         rec.resolvedAt = logTime;
-        resolvedCount++;
 
         this.auditLogs.push({
           id: `AUD-${String(5000 + i)}`,
@@ -109,11 +109,10 @@ export class FinancialStore {
           status: 'RESOLVED',
           operator: 'AI Controller'
         });
-      } else if (i < 48) {
-        // Human Review Required (10 cases)
+      } else if (i < resolvedTarget + reviewTarget) {
+        // Human Review Required
         rec.status = 'HUMAN_REVIEW';
         rec.issueStatus = 'HUMAN_REVIEW';
-        reviewCount++;
 
         this.auditLogs.push({
           id: `AUD-${String(5000 + i)}`,
@@ -129,11 +128,10 @@ export class FinancialStore {
           status: 'WARNING',
           operator: 'AI Controller'
         });
-      } else if (i < 55) {
-        // Investigating (7 cases: i from 48 to 54)
+      } else if (i < resolvedTarget + reviewTarget + investigatingTarget) {
+        // Investigating
         rec.status = 'INVESTIGATING';
         rec.issueStatus = 'INVESTIGATING';
-        investigatingCount++;
 
         this.auditLogs.push({
           id: `AUD-${String(5000 + i)}`,
@@ -150,10 +148,9 @@ export class FinancialStore {
           operator: 'AI Controller'
         });
       } else {
-        // Unresolved (78 cases: i from 55 to 132)
+        // Unresolved
         rec.status = 'UNRESOLVED';
         rec.issueStatus = 'UNRESOLVED';
-        unresolvedCount++;
 
         this.auditLogs.push({
           id: `AUD-${String(5000 + i)}`,
@@ -190,23 +187,41 @@ export class FinancialStore {
     const totalProcessed = this.payments.reduce((sum, p) => sum + p.amount, 0);
     const settledAmount = this.settlements.filter(s => s.status === 'settled').reduce((sum, s) => sum + s.netSettled, 0);
 
-    const exceptions = this.records.filter(r => r.status !== 'MATCHED');
+    const totalRecords = this.records.length;
     const matchedCount = this.records.filter(r => r.status === 'MATCHED').length;
-    const resolvedRecords = this.records.filter(r => r.status === 'AI_RESOLVED');
-    const humanReviewRecords = this.records.filter(r => r.status === 'HUMAN_REVIEW');
-    const investigatingRecords = this.records.filter(r => r.status === 'INVESTIGATING' || r.issueStatus === 'INVESTIGATING');
-    const unresolvedRecords = exceptions.filter(r => 
-      r.status !== 'AI_RESOLVED' && 
-      r.status !== 'HUMAN_REVIEW' && 
-      r.status !== 'INVESTIGATING' && 
+    const exceptionCount = totalRecords - matchedCount;
+
+    const exceptionRecords = this.records.filter(r => r.status !== 'MATCHED');
+
+    const resolvedRecords = exceptionRecords.filter(r =>
+      r.status === 'AI_RESOLVED' || r.issueStatus === 'RESOLVED'
+    );
+    const humanReviewRecords = exceptionRecords.filter(r =>
+      r.status !== 'AI_RESOLVED' &&
+      r.issueStatus !== 'RESOLVED' &&
+      (r.status === 'HUMAN_REVIEW' || r.issueStatus === 'HUMAN_REVIEW')
+    );
+    const investigatingRecords = exceptionRecords.filter(r =>
+      r.status !== 'AI_RESOLVED' &&
+      r.issueStatus !== 'RESOLVED' &&
+      r.status !== 'HUMAN_REVIEW' &&
+      r.issueStatus !== 'HUMAN_REVIEW' &&
+      (r.status === 'INVESTIGATING' || r.issueStatus === 'INVESTIGATING')
+    );
+    const unresolvedRecords = exceptionRecords.filter(r =>
+      r.status !== 'AI_RESOLVED' &&
+      r.issueStatus !== 'RESOLVED' &&
+      r.status !== 'HUMAN_REVIEW' &&
+      r.issueStatus !== 'HUMAN_REVIEW' &&
+      r.status !== 'INVESTIGATING' &&
       r.issueStatus !== 'INVESTIGATING'
     );
 
-    const amountAffected = exceptions.reduce((sum, r) => sum + r.actualAmount, 0);
+    const amountAffected = exceptionRecords.reduce((sum, r) => sum + r.actualAmount, 0);
     const resolvedAmount = resolvedRecords.reduce((sum, r) => sum + r.actualAmount, 0);
-    const unresolvedAmount = (amountAffected - resolvedAmount);
+    const unresolvedAmount = Math.max(0, amountAffected - resolvedAmount);
 
-    const openIncidents = this.incidents.filter(i => i.status !== 'RESOLVED');
+    const openIncidents = this.incidents.filter(i => i.status !== 'RESOLVED' && i.status !== 'DISMISSED');
     const resolvedIncidents = this.incidents.filter(i => i.status === 'RESOLVED');
     const openCount = humanReviewRecords.length + investigatingRecords.length + unresolvedRecords.length;
 
@@ -216,11 +231,11 @@ export class FinancialStore {
       amountAffected,
       resolvedAmount,
       unresolvedAmount,
-      totalRecords: this.records.length,
+      totalRecords,
       baselineRecords: 500,
-      simulatedRecords: Math.max(0, this.records.length - 500),
+      simulatedRecords: Math.max(0, totalRecords - 500),
       matchedCount,
-      exceptionCount: exceptions.length,
+      exceptionCount,
       resolvedCount: resolvedRecords.length,
       humanReviewCount: humanReviewRecords.length,
       investigatingCount: investigatingRecords.length,
@@ -229,7 +244,7 @@ export class FinancialStore {
       openIncidentsCount: openIncidents.length,
       resolvedIncidentsCount: resolvedIncidents.length,
       totalIncidentsCount: this.incidents.length,
-      activeIncidents: this.incidents,
+      activeIncidents: openIncidents,
       recentAuditLogs: this.auditLogs.slice(-8).reverse()
     };
   }
@@ -246,8 +261,13 @@ export class FinancialStore {
     let tn = 0; // True negative (normal record correctly matched)
 
     for (const r of this.records) {
-      const isActuallyAnomaly = r.groundTruthAnomaly && r.groundTruthAnomaly !== 'NONE';
-      const isDetectedAnomaly = r.status !== 'MATCHED' || r.exceptionType !== 'NONE';
+      const isActuallyAnomaly = !!(r.groundTruthAnomaly && r.groundTruthAnomaly !== 'NONE');
+      // Detected = flagged as non-matched exception, or AI-resolved after detection.
+      // Do NOT treat clean MATCHED records (issueStatus often 'RESOLVED') as detections.
+      const isDetectedAnomaly =
+        r.status === 'AI_RESOLVED' ||
+        (r.status !== 'MATCHED' && r.exceptionType !== 'NONE') ||
+        (r.exceptionType !== 'NONE' && !!r.resolvedAt);
 
       if (isActuallyAnomaly && isDetectedAnomaly) tp++;
       else if (!isActuallyAnomaly && isDetectedAnomaly) fp++;
@@ -258,11 +278,14 @@ export class FinancialStore {
     const precision = tp / (tp + fp || 1);
     const recall = tp / (tp + fn || 1);
     const f1Score = (2 * precision * recall) / (precision + recall || 1);
-    const accuracy = (tp + tn) / totalRecords;
+    const accuracy = (tp + tn) / (totalRecords || 1);
+    const falsePositiveRate = fp / (fp + tn || 1);
+    const detectionRate = recall; // same as recall for binary anomaly detection
 
     const totalProcessedAmount = this.payments.reduce((sum, p) => sum + p.amount, 0);
     const settledAmount = this.settlements.filter(s => s.status === 'settled').reduce((sum, s) => sum + s.netSettled, 0);
     const exceptions = this.records.filter(r => r.status !== 'MATCHED');
+    const matchRate = (totalRecords - exceptions.length) / (totalRecords || 1);
     const amountAffected = exceptions.reduce((sum, r) => sum + r.actualAmount, 0);
     const amountResolved = this.records.filter(r => r.status === 'AI_RESOLVED').reduce((sum, r) => sum + r.actualAmount, 0);
     const amountUnresolved = amountAffected - amountResolved;
@@ -315,12 +338,14 @@ export class FinancialStore {
         anomalyRatio: Math.round((groundTruthAnomalies / totalRecords) * 1000) / 10
       },
       reconciliation: {
-        matchRate: Math.round(((totalRecords - exceptions.length) / totalRecords) * 1000) / 10,
-        exceptionRate: Math.round((exceptions.length / totalRecords) * 1000) / 10,
+        matchRate: Math.round(matchRate * 1000) / 10,
+        exceptionRate: Math.round((exceptions.length / (totalRecords || 1)) * 1000) / 10,
         precision: Math.round(precision * 1000) / 1000,
         recall: Math.round(recall * 1000) / 1000,
         f1Score: Math.round(f1Score * 1000) / 1000,
-        accuracy: Math.round(accuracy * 1000) / 1000
+        accuracy: Math.round(accuracy * 1000) / 1000,
+        falsePositiveRate: Math.round(falsePositiveRate * 1000) / 1000,
+        detectionRate: Math.round(detectionRate * 1000) / 1000
       },
       operations: {
         recordsProcessed: totalRecords,

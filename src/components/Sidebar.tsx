@@ -30,6 +30,7 @@ interface SidebarProps {
   onSelectView: (view: NavView) => void;
   exceptionCount: number;
   openIncidentCount: number;
+  totalRecords?: number;
   onResetData: () => void;
   onOpenSimulator: () => void;
   onOpenDemo?: () => void;
@@ -41,6 +42,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onSelectView,
   exceptionCount,
   openIncidentCount,
+  totalRecords = 0,
   onResetData,
   onOpenSimulator,
   onOpenDemo,
@@ -155,7 +157,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
               <span className="text-white/80 font-medium">Engine Active</span>
             </div>
-            <span>500 Records</span>
+            <span>{totalRecords || '—'} Records</span>
           </div>
           {openIncidentCount > 0 && (
             <p className="text-white/60 text-[11px] mt-1 font-sans">

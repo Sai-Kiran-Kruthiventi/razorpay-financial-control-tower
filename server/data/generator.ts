@@ -336,54 +336,51 @@ export function generateSyntheticDataset(seed: number = 42, count: number = 500)
       });
     }
 
-    // Batch settlements every 10 payments (T+1 or T+2 settlement cycle)
-    if (paymentStatus === 'captured') {
+    // Settlement handling
+    // MISSING_SETTLEMENT: intentionally omit from any settlement batch (truly missing).
+    // SETTLEMENT_MISMATCH: isolate into a dedicated single-payment settlement so the
+    // batch-level discrepancy does not contaminate unrelated sibling payments.
+    if (paymentStatus === 'captured' && anomaly === 'MISSING_SETTLEMENT') {
+      anomalyMap.set(paymentId, {
+        type: 'MISSING_SETTLEMENT',
+        description: `Payment captured 7 days ago but settlement cycle T+2 missed. UTR pending from nodal bank.`,
+        expectedResolution: 'Escalate to human operations for bank nodal account inquiry'
+      });
+    } else if (paymentStatus === 'captured' && anomaly === 'SETTLEMENT_MISMATCH') {
+      settlementIndex++;
+      const sId = `setl_${String(settlementIndex)}`;
+      const diff = rng.pick([350, 480, 720, 1150]);
+      const net = Math.round((paymentAmount - paymentFee - paymentTax - diff) * 100) / 100;
+      anomalyMap.set(paymentId, {
+        type: 'SETTLEMENT_MISMATCH',
+        description: `Settlement payout ₹${net.toLocaleString('en-IN')} has an unmapped fee variance of ₹${diff} against expected ₹${(net + diff).toLocaleString('en-IN')}.`,
+        expectedResolution: 'Auto-adjust settlement fee variance to unapplied interchange fee'
+      });
+      settlements.push({
+        id: sId,
+        paymentIds: [paymentId],
+        grossAmount: paymentAmount,
+        feesDeducted: paymentFee,
+        taxDeducted: paymentTax,
+        netSettled: net,
+        utr: `UTR${rng.nextInt(100000, 999999)}AXIS${rng.nextInt(1000, 9999)}`,
+        status: 'settled',
+        settledAt: new Date(recordTime.getTime() + 24 * 3600000).toISOString(),
+        discrepancyNote: `Bank settlement short by ₹${diff} due to unapplied interchange adjustment.`
+      });
+    } else if (paymentStatus === 'captured') {
+      // Batch settlements every 10 normal payments (T+1 or T+2 settlement cycle)
       currentSettlementBatch.push(payment);
       if (currentSettlementBatch.length >= 10 || i === count) {
         const batchPayments = [...currentSettlementBatch];
         currentSettlementBatch = [];
         settlementIndex++;
         const sId = `setl_${String(settlementIndex)}`;
-        
-        let gross = batchPayments.reduce((acc, p) => acc + p.amount, 0);
-        let fees = batchPayments.reduce((acc, p) => acc + p.fee, 0);
-        let tax = batchPayments.reduce((acc, p) => acc + p.tax, 0);
-        let net = Math.round((gross - fees - tax) * 100) / 100;
-        let setlStatus: Settlement['status'] = 'settled';
-        let discrepancyNote: string | undefined = undefined;
 
-        // Check if any payment in this batch has SETTLEMENT_MISMATCH
-        const hasSetlMismatch = batchPayments.some(p => anomalyIndices.get(Number(p.id.replace('pay_', '')) - 80000) === 'SETTLEMENT_MISMATCH');
-        if (hasSetlMismatch) {
-          const diff = rng.pick([350, 480, 720, 1150]);
-          net -= diff; // Bank deducted unexpected dispute or tier fee
-          discrepancyNote = `Bank settlement short by ₹${diff} due to unapplied interchange adjustment.`;
-          for (const p of batchPayments) {
-            if (anomalyIndices.get(Number(p.id.replace('pay_', '')) - 80000) === 'SETTLEMENT_MISMATCH') {
-              anomalyMap.set(p.id, {
-                type: 'SETTLEMENT_MISMATCH',
-                description: `Settlement payout ₹${net.toLocaleString('en-IN')} has an unmapped fee variance of ₹${diff} against expected ₹${(net + diff).toLocaleString('en-IN')}.`,
-                expectedResolution: 'Auto-adjust settlement fee variance to unapplied interchange fee'
-              });
-            }
-          }
-        }
-
-        // Check if payment has MISSING_SETTLEMENT
-        const hasMissingSetl = batchPayments.some(p => anomalyIndices.get(Number(p.id.replace('pay_', '')) - 80000) === 'MISSING_SETTLEMENT');
-        if (hasMissingSetl) {
-          setlStatus = 'on_hold';
-          discrepancyNote = 'Settlement batch held by nodal bank for compliance verification.';
-          for (const p of batchPayments) {
-            if (anomalyIndices.get(Number(p.id.replace('pay_', '')) - 80000) === 'MISSING_SETTLEMENT') {
-              anomalyMap.set(p.id, {
-                type: 'MISSING_SETTLEMENT',
-                description: `Payment captured 7 days ago but settlement cycle T+2 missed. UTR pending from nodal bank.`,
-                expectedResolution: 'Escalate to human operations for bank nodal account inquiry'
-              });
-            }
-          }
-        }
+        const gross = batchPayments.reduce((acc, p) => acc + p.amount, 0);
+        const fees = batchPayments.reduce((acc, p) => acc + p.fee, 0);
+        const tax = batchPayments.reduce((acc, p) => acc + p.tax, 0);
+        const net = Math.round((gross - fees - tax) * 100) / 100;
 
         settlements.push({
           id: sId,
@@ -393,12 +390,34 @@ export function generateSyntheticDataset(seed: number = 42, count: number = 500)
           taxDeducted: tax,
           netSettled: net,
           utr: `UTR${rng.nextInt(100000, 999999)}AXIS${rng.nextInt(1000, 9999)}`,
-          status: setlStatus,
-          settledAt: new Date(recordTime.getTime() + 24 * 3600000).toISOString(),
-          discrepancyNote
+          status: 'settled',
+          settledAt: new Date(recordTime.getTime() + 24 * 3600000).toISOString()
         });
       }
     }
+  }
+
+  // Flush any remaining payments that didn't fill a complete settlement batch
+  if (currentSettlementBatch.length > 0) {
+    settlementIndex++;
+    const sId = `setl_${String(settlementIndex)}`;
+    const batchPayments = [...currentSettlementBatch];
+    currentSettlementBatch = [];
+    const gross = batchPayments.reduce((acc, p) => acc + p.amount, 0);
+    const fees = batchPayments.reduce((acc, p) => acc + p.fee, 0);
+    const tax = batchPayments.reduce((acc, p) => acc + p.tax, 0);
+    const net = Math.round((gross - fees - tax) * 100) / 100;
+    settlements.push({
+      id: sId,
+      paymentIds: batchPayments.map(p => p.id),
+      grossAmount: gross,
+      feesDeducted: fees,
+      taxDeducted: tax,
+      netSettled: net,
+      utr: `UTR${rng.nextInt(100000, 999999)}AXIS${rng.nextInt(1000, 9999)}`,
+      status: 'settled',
+      settledAt: new Date(baseDate.getTime() + count * 18 * 60000 + 24 * 3600000).toISOString()
+    });
   }
 
   return {

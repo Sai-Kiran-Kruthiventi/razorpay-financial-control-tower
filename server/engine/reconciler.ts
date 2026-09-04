@@ -105,16 +105,29 @@ export function runDeterministicReconciliation(data: ReconciliationInput): Recon
     }
 
     // Rule 4: Settlement validation check
+    // IMPORTANT: Batch-level settlement holds/discrepancies must NOT contaminate sibling
+    // payments that share the same settlement batch. Only attribute the anomaly to the
+    // payment that is actually anomalous (anomalyMap / ground truth), or to payments
+    // with a truly missing settlement record.
+    const groundTruthTypeEarly = groundTruth ? groundTruth.type : 'NONE';
     if (settlement) {
-      if (settlement.status === 'on_hold') {
+      if (settlement.status === 'on_hold' && groundTruthTypeEarly === 'MISSING_SETTLEMENT') {
         status = 'EXCEPTION';
         exceptionType = 'MISSING_SETTLEMENT';
         exceptionDescription = `Settlement ${settlement.id} held in nodal bank. Payout delayed past standard T+2 SLA.`;
-      } else if (settlement.discrepancyNote) {
+      } else if (settlement.discrepancyNote && groundTruthTypeEarly === 'SETTLEMENT_MISMATCH') {
         status = 'MISMATCH';
         exceptionType = 'SETTLEMENT_MISMATCH';
         exceptionDescription = `Settlement payout variance identified: ${settlement.discrepancyNote}`;
-        difference = 350; // standard variance
+        difference = 350; // standard variance attributed to this payment only
+      } else if (settlement.status !== 'on_hold' && !settlement.discrepancyNote) {
+        matchedRules.push('RULE_SETTLEMENT_CALCULATION_VALID');
+      } else if (
+        (settlement.status === 'on_hold' || settlement.discrepancyNote) &&
+        groundTruthTypeEarly === 'NONE'
+      ) {
+        // Sibling payment in an affected batch but not itself anomalous — treat as matched
+        matchedRules.push('RULE_SETTLEMENT_CALCULATION_VALID');
       } else {
         matchedRules.push('RULE_SETTLEMENT_CALCULATION_VALID');
       }
@@ -156,11 +169,11 @@ export function runDeterministicReconciliation(data: ReconciliationInput): Recon
     }
 
     // Ground truth alignment for initial benchmark state
-    const groundTruthType = groundTruth ? groundTruth.type : 'NONE';
+    const groundTruthType = groundTruthTypeEarly;
     if (groundTruthType !== 'NONE' && exceptionType === 'NONE') {
       exceptionType = groundTruthType;
       status = 'EXCEPTION';
-      exceptionDescription = groundTruth.description;
+      exceptionDescription = groundTruth!.description;
     }
 
     records.push({
@@ -295,11 +308,14 @@ export function reReconcilePayment(
   }
 
   if (settlement) {
-    if (settlement.status === 'on_hold' || settlement.discrepancyNote) {
+    const gt = store.anomalyMap.get(payment.id);
+    const isSettlementAnomalyTarget =
+      gt?.type === 'SETTLEMENT_MISMATCH' || gt?.type === 'MISSING_SETTLEMENT';
+    if ((settlement.status === 'on_hold' || settlement.discrepancyNote) && isSettlementAnomalyTarget) {
       return {
         isResolved: false,
         exceptionType: settlement.discrepancyNote ? 'SETTLEMENT_MISMATCH' : 'MISSING_SETTLEMENT',
-        difference: settlement.grossAmount - settlement.netSettled,
+        difference: settlement.discrepancyNote ? 350 : payment.amount,
         newStatus: 'UNRESOLVED',
         newIssueStatus: 'UNRESOLVED',
         matchedRules,

@@ -46,7 +46,7 @@ export function executeSafeAction(
         const overage = totalRefunded - payment.amount;
         const lastRefund = existingRefunds[existingRefunds.length - 1];
         lastRefund.amount = Math.max(0, lastRefund.amount - overage);
-        record.difference = 0;
+        store.anomalyMap.delete(record.paymentId);
         return {
           success: true,
           actionType,
@@ -77,6 +77,7 @@ export function executeSafeAction(
 
     // 2. Update payment status in synthetic dataset
     payment.status = 'refunded';
+    store.anomalyMap.delete(payment.id);
 
     // 3. Emit webhook event
     const refundEvent: WebhookEvent = {
@@ -131,6 +132,8 @@ export function executeSafeAction(
       settlement.settledAt = timestamp;
     }
 
+    store.anomalyMap.delete(record.paymentId);
+
     const settlementEvent: WebhookEvent = {
       id: `evt_setl_${Date.now().toString().slice(-6)}`,
       event: 'settlement.processed',
@@ -160,7 +163,7 @@ export function executeSafeAction(
       const diff = Math.abs(order.amount - payment.amount);
       order.amount = payment.amount;
       order.itemsSummary = `${order.itemsSummary} (Invoice voucher applied: ₹${diff.toLocaleString('en-IN')})`;
-      record.difference = 0;
+      store.anomalyMap.delete(record.paymentId);
       return {
         success: true,
         actionType,
@@ -171,6 +174,8 @@ export function executeSafeAction(
         }
       };
     }
+
+    store.anomalyMap.delete(record.paymentId);
 
     return {
       success: true,
@@ -225,6 +230,8 @@ export function executeSafeAction(
       failedEvt.deliveryStatus = 'dropped';
     }
   }
+
+  store.anomalyMap.delete(record.paymentId);
 
   return {
     success: true,

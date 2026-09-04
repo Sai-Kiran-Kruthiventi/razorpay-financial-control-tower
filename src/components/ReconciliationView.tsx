@@ -15,6 +15,7 @@ import {
 interface ReconciliationViewProps {
   initialStatusFilter?: string;
   metrics?: DashboardMetrics | null;
+  dataVersion?: number;
   onInvestigate: (record: ReconciliationRecord) => void;
   onExplainMoney: (queryId: string) => void;
   onApproveAction: (record: ReconciliationRecord) => void;
@@ -23,6 +24,7 @@ interface ReconciliationViewProps {
 export const ReconciliationView: React.FC<ReconciliationViewProps> = ({
   initialStatusFilter = 'ALL',
   metrics,
+  dataVersion = 0,
   onInvestigate,
   onExplainMoney,
   onApproveAction
@@ -38,13 +40,13 @@ export const ReconciliationView: React.FC<ReconciliationViewProps> = ({
   const [isReconciling, setIsReconciling] = useState(false);
   const [reconBanner, setReconBanner] = useState<string | null>(null);
 
-  const totalCount = metrics?.totalRecords ?? 500;
-  const matchedCount = metrics?.matchedCount ?? 367;
-  const exceptionCount = metrics?.exceptionCount ?? 133;
-  const resolvedCount = metrics?.resolvedCount ?? 38;
-  const humanReviewCount = metrics?.humanReviewCount ?? 10;
-  const investigatingCount = metrics?.investigatingCount ?? 7;
-  const unresolvedCount = metrics?.unresolvedCount ?? 78;
+  const totalCount = metrics?.totalRecords ?? 0;
+  const matchedCount = metrics?.matchedCount ?? 0;
+  const exceptionCount = metrics?.exceptionCount ?? 0;
+  const resolvedCount = metrics?.resolvedCount ?? 0;
+  const humanReviewCount = metrics?.humanReviewCount ?? 0;
+  const investigatingCount = metrics?.investigatingCount ?? 0;
+  const unresolvedCount = metrics?.unresolvedCount ?? 0;
   const pendingVerification = humanReviewCount + investigatingCount + unresolvedCount;
 
   const handleRunFullReconciliation = async () => {
@@ -104,7 +106,7 @@ export const ReconciliationView: React.FC<ReconciliationViewProps> = ({
 
   useEffect(() => {
     fetchRecords();
-  }, [page, statusFilter, searchQuery, metrics]);
+  }, [page, statusFilter, searchQuery, metrics, dataVersion]);
 
   const formatRupees = (amount: number) => {
     return `₹${Math.round(amount).toLocaleString('en-IN')}`;
